@@ -54,20 +54,14 @@ const APPCODE = "hehe"
    -post(img, face string) : string, error
     [functions]
    +GetIDCard(faceUrl, backUrl string) : IDOCR, error
+   -getIDCardOCR(imgFace, imgBack string) : IDOCR, error
 
 ▼-aliDataValue : struct
     [fields]
-   +Address : string
-   +Birth : string
-   +EndDate : string
-   +Issue : string
-   +Name : string
-   +Nationality : string
-   +Num : string
    +RequestId : string
-   +Sex : string
-   +StartDate : string
    +Success : bool
+    [embedded]
+   +IDOCR : IDOCR
 
 ▼-aliDetail : struct
     [fields]
@@ -83,7 +77,8 @@ const APPCODE = "hehe"
    +Outputs : []aliDetail
 
 ▼ functions
-   -get(url string) : string, error
+   -getAndBase64(url string) : string, error
+   -getIDCardImg(faceUrl, backUrl string) : string, string, error
 
 ```
 
