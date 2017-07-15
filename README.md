@@ -1,5 +1,11 @@
 # aliyun-id-ocr
 
+## 阿里云身份证 OCR 介绍
+
+- 链接地址: [印刷文字识别-身份证识别](https://market.aliyun.com/products/57124001/cmapi010401.html?spm=5176.doc51066.765261.490.zn1VeX#sku=yuncode440100000)
+- 调用方式: 上传图片的 base64 编码值
+- 接口速度: 主要取决于图片大小，一般2M以内响应比较及时，超过2M可能会超时，返回 HTTP 状态码 408
+
 ## 使用方法
 
 添加自己的产品密钥
