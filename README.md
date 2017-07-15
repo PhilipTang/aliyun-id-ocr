@@ -105,4 +105,10 @@ const APPCODE = "hehe"
  ok  	_/Users/philiptang/Code/aliyun-id-ocr	11.855s
  ```
 
+详细打印
+
+```go
+go test -v -stderrthreshold=INFO
+```
+
 
