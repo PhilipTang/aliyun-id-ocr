@@ -32,10 +32,10 @@ func TestBack(t *testing.T) {
 	assert.Equal("20040325", idocr.StartDate)
 }
 
-func TestGet(t *testing.T) {
+func TestGetAndBase64(t *testing.T) {
 	assert := assert.New(t)
 	faceUrl := "http://stoneip.info/wp-content/uploads/2014/12/20131168257.jpg"
-	_, err := get(faceUrl)
+	_, err := getAndBase64(faceUrl)
 	assert.Nil(err)
 }
 

@@ -18,15 +18,15 @@ import (
 const APPCODE = "hehe"
 
 type IDOCR struct {
-	Name        string // 姓名
-	Sex         string // 性别: 男|女
-	Nationality string // 民族: 汉
-	Birth       string // 出生: 19890714
-	Address     string // 住址
-	Num         string // 身份证号 带x和纯数字
-	Issue       string // 签发机关
-	StartDate   string // 有效期限，开始时间 20170714
-	EndDate     string // 有效期限，结束时间 20370714
+	Name        string `json:"name"`        // 姓名
+	Sex         string `json:"sex"`         // 性别: 男|女
+	Nationality string `json:"nationality"` // 民族: 汉
+	Birth       string `json:"birth"`       // 出生: 19890714
+	Address     string `json:"address"`     // 住址
+	Num         string `json:"num"`         // 身份证号 带x和纯数字
+	Issue       string `json:"issue"`       // 签发机关
+	StartDate   string `json:"start_date"`  // 有效期限，开始时间 20170714
+	EndDate     string `json:"end_date"`    // 有效期限，结束时间 20370714
 }
 
 type aliResult struct {
@@ -43,19 +43,9 @@ type aliOutputValue struct {
 }
 
 type aliDataValue struct {
-	// 正脸面
-	Address     string `json:"address"`
-	Birth       string `json:"birth"`
-	Name        string `json:"name"`
-	Nationality string `json:"nationality"`
-	Num         string `json:"num"`
-	RequestId   string `json:"request_id"`
-	Sex         string `json:"sex"`
-	Success     bool   `json:"success"` // 识别结果，true表示成功，false表示失败
-	// 国徽面
-	Issue     string `json:"issue"` // 签发机关
-	EndDate   string `json:"end_date"`
-	StartDate string `json:"start_date"`
+	RequestId string `json:"request_id"`
+	Success   bool   `json:"success"` // 识别结果，true 表示成功，false 表示失败
+	IDOCR
 }
 
 // 识别正脸面
@@ -108,45 +98,99 @@ func (id *IDOCR) Back(base64img string) (err error) {
 func GetIDCard(faceUrl, backUrl string) (idcard IDOCR, err error) {
 	fn := "idocr.GetIDCard"
 
-	var (
-		imgFace       string
-		imgBack       string
-		base64imgFace string
-		base64imgBack string
-		idcardBack    IDOCR
-		err1          error
-		err2          error
-		err3          error
-		err4          error
-	)
-
-	imgFace, err1 = get(faceUrl)
-	imgBack, err2 = get(backUrl)
-
-	if err1 != nil || err2 != nil {
-		glog.Errorf("@%s, get img failed, faceUrl=%s, backUrl=%s, face_err=%s, back_err=%s", fn, faceUrl, backUrl, err1, err2)
+	imgFace, imgBack, imgErr := getIDCardImg(faceUrl, backUrl)
+	if imgErr != nil {
+		err = imgErr
+		glog.Errorf("@%s, getIDCardImg failed, err=%s", fn, err)
 		return
 	}
 
-	base64imgFace = base64.StdEncoding.EncodeToString([]byte(imgFace))
-	base64imgBack = base64.StdEncoding.EncodeToString([]byte(imgBack))
-
-	err3 = idcard.Face(base64imgFace)
-	err4 = idcardBack.Back(base64imgBack)
-
-	if err3 != nil || err4 != nil {
-		glog.Errorf("@%s, img OCR failed, face_err=%s, back_err=%s", fn, err3, err4)
+	var ocrErr error
+	idcard, ocrErr = getIDCardOCR(imgFace, imgBack)
+	if ocrErr != nil {
+		err = ocrErr
+		glog.Errorf("@%s, getIDCardOCR failed, err=%s", fn, err)
 		return
 	}
-
-	idcard.Issue = idcardBack.Issue
-	idcard.StartDate = idcardBack.StartDate
-	idcard.EndDate = idcardBack.EndDate
 
 	return
 }
 
-func get(url string) (result string, err error) {
+func getIDCardImg(faceUrl, backUrl string) (imgFace, imgBack string, err error) {
+	fn := "getIDCardImg"
+
+	c1 := make(chan string)
+	c2 := make(chan string)
+
+	go func(url string) {
+		imgData, _ := getAndBase64(url)
+		c1 <- imgData
+	}(faceUrl)
+	go func(url string) {
+		imgData, _ := getAndBase64(url)
+		c2 <- imgData
+	}(backUrl)
+
+	for i := 0; i < 2; i++ {
+		select {
+		case imgFace = <-c1:
+		case imgBack = <-c2:
+		}
+	}
+
+	if imgFace == "" {
+		err = errors.New(fmt.Sprintf("@%s, 请求正脸面照片失败, url=%s", fn, faceUrl))
+		return
+	}
+	if imgBack == "" {
+		err = errors.New(fmt.Sprintf("@%s, 请求国徽面照片失败, url=%s", fn, backUrl))
+		return
+	}
+	return
+}
+
+func getIDCardOCR(imgFace, imgBack string) (idcard IDOCR, err error) {
+	fn := "getIDCardOCR"
+
+	c1 := make(chan IDOCR)
+	c2 := make(chan IDOCR)
+
+	go func(img string) {
+		var id IDOCR
+		_ = id.Face(img)
+		c1 <- id
+	}(imgFace)
+	go func(img string) {
+		var id IDOCR
+		_ = id.Back(img)
+		c2 <- id
+	}(imgBack)
+
+	var idcardBack IDOCR
+
+	for i := 0; i < 2; i++ {
+		select {
+		case idcard = <-c1:
+		case idcardBack = <-c2:
+		}
+	}
+
+	if idcard.Name == "" {
+		err = errors.New(fmt.Sprintf("@%s, 识别正脸面OCR失败, face_idcard=%+v", fn, idcard))
+		return
+	}
+	if idcardBack.EndDate == "" {
+		err = errors.New(fmt.Sprintf("@%s, 识别国徽面OCR失败, back_idcard=%+v", fn, idcardBack))
+	}
+
+	idcard.StartDate = idcardBack.StartDate
+	idcard.EndDate = idcardBack.EndDate
+	idcard.Issue = idcardBack.Issue
+
+	return
+}
+
+func getAndBase64(url string) (result string, err error) {
 	fn := "idocr.get"
 	glog.Infof("@%s, url=%s", fn, url)
 
@@ -175,7 +219,7 @@ func get(url string) (result string, err error) {
 		return
 	}
 
-	result = string(body)
+	result = base64.StdEncoding.EncodeToString(body)
 	return
 }
 
